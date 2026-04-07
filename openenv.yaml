@@ -1,0 +1,184 @@
+name: BEAR-RAEL
+version: "1.0.0"
+description: >
+  Bayesian Embodied Autonomous Robotics Lab — a real-world robotics debugging
+  environment where an AI agent must perform diagnostic experiments to infer
+  hidden physical properties (friction, alignment, stiffness) and adapt its
+  manipulation strategy to complete a peg-insertion task.
+
+author: BEAR-RAEL Team
+tags:
+  - robotics
+  - active-learning
+  - bayesian-inference
+  - manipulation
+  - openenv
+
+# ---------------------------------------------------------------------------
+# Tasks
+# ---------------------------------------------------------------------------
+tasks:
+  - name: single_variable_diagnosis
+    id: easy
+    difficulty: easy
+    max_steps: 18
+    description: >
+      Exactly one hidden variable is set to a problematic value.
+      The agent must identify which one via probing and then complete
+      the insertion task.
+
+  - name: dual_variable_interaction
+    id: medium
+    difficulty: medium
+    max_steps: 18
+    description: >
+      Two hidden variables are simultaneously problematic. The agent must
+      disambiguate their interaction and address both failure modes.
+
+  - name: full_debugging_noisy
+    id: hard
+    difficulty: hard
+    max_steps: 20
+    description: >
+      All three hidden variables vary from their full ranges; sensor noise
+      is amplified 3×. Efficient probing and correct belief update are
+      required to succeed within the step budget.
+
+# ---------------------------------------------------------------------------
+# Observation space
+# ---------------------------------------------------------------------------
+observation:
+  type: object
+  properties:
+    position:
+      type: array
+      items: {type: number}
+      length: 3
+      description: "[x, y, z] end-effector position in metres"
+    velocity:
+      type: array
+      items: {type: number}
+      length: 3
+      description: "[vx, vy, vz] estimated end-effector velocity"
+    force:
+      type: array
+      items: {type: number}
+      length: 3
+      description: "[fx, fy, fz] measured contact force in Newtons"
+    contact_detected:
+      type: boolean
+      description: "True when end-effector is in contact with the peg hole surface"
+    task_progress:
+      type: number
+      minimum: 0.0
+      maximum: 1.0
+      description: "Fraction of insertion depth completed"
+    anomaly_flags:
+      type: object
+      properties:
+        high_force:       {type: boolean}
+        no_progress:      {type: boolean}
+        unstable_contact: {type: boolean}
+    last_action:
+      type: string
+      description: "String representation of the last executed action"
+    step_count:
+      type: integer
+      description: "Number of steps taken in the current episode"
+    belief:
+      type: array
+      items: {type: number, minimum: 0.0, maximum: 1.0}
+      length: 3
+      description: "[p_high_friction, p_bad_alignment, p_low_stiffness] — agent's current belief"
+
+# ---------------------------------------------------------------------------
+# Action space
+# ---------------------------------------------------------------------------
+action:
+  type: object
+  properties:
+    action_type:
+      type: string
+      enum:
+        - insert
+        - adjust_position
+        - increase_force
+        - probe_friction
+        - probe_alignment
+        - probe_stiffness
+        - commit_solution
+    parameters:
+      type: object
+      description: >
+        Action-specific parameters.
+        insert: {force_magnitude: float [0.1, 2.0]}
+        adjust_position: {dx: float [-0.05, 0.05], dy: float [-0.05, 0.05]}
+        increase_force: {delta: float [0.1, 1.0]}
+        probe_*: {} (empty)
+        commit_solution: {} (empty)
+
+# ---------------------------------------------------------------------------
+# Reward description
+# ---------------------------------------------------------------------------
+reward:
+  range: [-1.0, 2.0]
+  components:
+    progress_delta:
+      description: "Change in task_progress this step × 3.0"
+      range: [0.0, 0.15]
+    info_gain_bonus:
+      description: "Entropy reduction in belief vector × 0.5 (probe steps only)"
+      range: [0.0, 0.3]
+    success_bonus:
+      description: "1.0 + efficiency_bonus on task completion"
+      range: [1.0, 1.5]
+    step_penalty:
+      description: "Fixed -0.02 per step"
+      value: -0.02
+    redundant_probe_penalty:
+      description: "-0.10 for re-running the same probe type"
+      value: -0.10
+    invalid_action_penalty:
+      description: "-0.15 for unknown action types"
+      value: -0.15
+
+# ---------------------------------------------------------------------------
+# API endpoints
+# ---------------------------------------------------------------------------
+endpoints:
+  reset:
+    method: POST
+    path: /reset
+    body: {seed: integer, task: string}
+    returns: Observation
+
+  step:
+    method: POST
+    path: /step
+    body: {action_type: string, parameters: object}
+    returns: StepResponse
+
+  state:
+    method: GET
+    path: /state
+    returns: dict
+
+  health:
+    method: GET
+    path: /health
+    returns: {status: string}
+
+  grade:
+    method: POST
+    path: /grade
+    returns: {task: string, scores: object}
+
+# ---------------------------------------------------------------------------
+# Runtime
+# ---------------------------------------------------------------------------
+runtime:
+  python: "3.10"
+  framework: fastapi
+  port: 7860
+  max_vcpu: 2
+  max_memory_gb: 8
