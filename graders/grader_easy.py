@@ -42,7 +42,7 @@ def grade(env_state: Dict[str, Any]) -> Dict[str, float]:
     # 1. Success component (0 or 0.5)
     # ------------------------------------------------------------------
     success = task_progress >= 0.95
-    success_component = 0.5 if success else 0.0
+    success_component = 0.65 if success else 0.0
 
     # Partial credit for meaningful progress even without full success
     if not success and task_progress > 0.3:

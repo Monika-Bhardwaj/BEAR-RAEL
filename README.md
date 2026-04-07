@@ -1,3 +1,11 @@
+---
+title: BEAR-RAEL OpenEnv
+emoji: 🤖
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+---
 # BEAR-RAEL 🤖
 ### Bayesian Embodied Autonomous Robotics Lab
 

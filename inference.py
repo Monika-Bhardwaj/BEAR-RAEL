@@ -117,7 +117,7 @@ PHASE 1 — DIAGNOSIS (steps 1-3 ONLY):
 
 PHASE 2 — ACTION (steps 4 onward, MANDATORY):
   - Read the belief: [p_high_friction, p_bad_alignment, p_low_stiffness]
-  - If p_bad_alignment > 0.6  → use adjust_position with dx=0.02, dy=0.02
+  - If p_bad_alignment > 0.6  → use adjust_position with dx=0.01, dy=0.01
   - If p_high_friction > 0.6  → use increase_force with delta=0.5, then insert
   - If p_low_stiffness > 0.6  → use insert with force_magnitude=2.0 (stiffness means MORE force needed)
   - Otherwise                 → use insert with force_magnitude=1.2
@@ -126,7 +126,7 @@ PHASE 2 — ACTION (steps 4 onward, MANDATORY):
 
 === PARAMETER NAMES (EXACT — do not invent names) ===
   insert:           {"force_magnitude": 1.2}
-  adjust_position:  {"dx": 0.02, "dy": 0.02}
+  adjust_position:  {"dx": 0.01, "dy": 0.01}
   increase_force:   {"delta": 0.5}
   probe_*:          {}
   commit_solution:  {}
@@ -216,21 +216,25 @@ def get_agent_action(
 
     except Exception as exc:
         print(f"[DEBUG] LLM error: {exc}", flush=True)
-        # Smart fallback: probe sequentially (never repeat), then insert at high force
+        # Smart dynamic fallback: probe sequentially (never repeat), then adjust iteratively!
         progress = obs.get("task_progress", 0.0)
         if progress >= 0.93:
             return "commit_solution", {}, "fallback:commit"
-        if probes_used == 0:
-            return "probe_friction", {}, "fallback:probe_friction"
-        if probes_used == 1:
-            return "probe_alignment", {}, "fallback:probe_alignment"
-        if probes_used == 2:
-            return "probe_stiffness", {}, "fallback:probe_stiffness"
-        # After 3 probes: select best action from belief
+        if probes_used == 0: return "probe_friction", {}, "fallback:probe_friction"
+        if probes_used == 1: return "probe_alignment", {}, "fallback:probe_alignment"
+        if probes_used == 2: return "probe_stiffness", {}, "fallback:probe_stiffness"
+        
+        # After 3 probes: select best action from belief, track real bounds constraints
         belief = obs.get("belief", [0.5, 0.5, 0.5])
-        if belief[1] > 0.6 and adjustments_used < 2:
-            return "adjust_position", {"dx": 0.02, "dy": 0.02}, "fallback:adjust"
-        return "insert", {"force_magnitude": 2.0}, f"fallback:insert (err={exc})"
+        if belief[1] > 0.6 and adjustments_used < 4:
+            # We must oscillate bounds or approach optimally without blowing out of boundaries!
+            pos = obs.get("position", [0.0, 0.0, 0.0])
+            dx = max(min(-pos[0], 0.01), -0.01) if abs(pos[0]) > 0.0 else 0.01
+            dy = max(min(-pos[1], 0.01), -0.01) if abs(pos[1]) > 0.0 else 0.01
+            return "adjust_position", {"dx": dx, "dy": dy}, "fallback:adjust"
+            
+        force = 4.0 if belief[2] > 0.6 else 2.0
+        return "insert", {"force_magnitude": force}, f"fallback:insert (err={exc})"
 
 
 # ---------------------------------------------------------------------------

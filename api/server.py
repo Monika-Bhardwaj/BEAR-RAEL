@@ -15,12 +15,13 @@ from __future__ import annotations
 import sys
 import os
 
+from typing import Any, Dict, Optional
+
 # Ensure project root is on path when running from api/ subdirectory
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from typing import Any, Dict, Optional
-
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from env.environment import BearRaelEnv, Action, Observation
@@ -81,6 +82,22 @@ class GradeResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
+@app.get("/", response_class=HTMLResponse)
+def read_root():
+    return """
+    <html>
+        <head><title>BEAR-RAEL OpenEnv</title></head>
+        <body style="font-family: sans-serif; text-align: center; margin-top: 50px;">
+            <h1>🤖 BEAR-RAEL OpenEnv</h1>
+            <p>Your Bayesian Robotics API is <strong>RUNNING</strong>!</p>
+            <p>STATUS: <span style="color: green;">OK 200</span></p>
+            <hr style="width: 50%;" />
+            <p><a href="/docs" style="display:inline-block; padding: 10px 20px; background-color: #007BFF; color: white; text-decoration: none; border-radius: 5px;">View API Documentation</a></p>
+        </body>
+    </html>
+    """
+
 
 @app.get("/health")
 def health() -> dict:
