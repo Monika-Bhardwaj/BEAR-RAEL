@@ -76,7 +76,7 @@ class StepResponse(BaseModel):
 
 class GradeResponse(BaseModel):
     task:   str
-    scores: Dict[str, float]
+    scores: Dict[str, Any]
 
 
 # ---------------------------------------------------------------------------
