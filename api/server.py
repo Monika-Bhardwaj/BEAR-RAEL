@@ -113,7 +113,8 @@ def list_tasks() -> dict:
 
 
 @app.post("/reset", response_model=Observation)
-def reset(req: ResetRequest) -> Observation:
+def reset(req: ResetRequest = None) -> Observation:
+    req = req or ResetRequest()
     if req.task not in TASK_REGISTRY:
         raise HTTPException(
             status_code=400,
