@@ -1,0 +1,29 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+.env
+
+# Unit test / coverage reports
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Local configuration
+.vscode/
+
+# Project temporary files
+*.txt
+raw_scores.txt
+scores.txt
+scores2.txt
+final_metrics.txt
+inference_output.txt
+validator_out.txt
+api/
