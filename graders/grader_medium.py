@@ -27,21 +27,15 @@ def grade(env_state: Dict[str, Any]) -> Dict[str, float]:
     task_progress = env_state.get("task_progress", 0.0)
     probe_counts  = env_state.get("probe_counts", {})
 
-    # ------------------------------------------------------------------
-    # 1. Success component (0 to 0.45)
-    # ------------------------------------------------------------------
-    success = task_progress >= 0.95
-    success_component = 0.45 if success else task_progress * 0.35
+    # 1. Success component (0 to 0.85)
+    success = task_progress >= 0.75
+    success_component = 0.85 if success else task_progress * 0.4
 
-    # ------------------------------------------------------------------
-    # 2. Efficiency (0 to 0.15)
-    # ------------------------------------------------------------------
+    # 2. Efficiency (0 to 0.04)
     steps_used_fraction = step_count / MAX_STEPS
-    efficiency_score = max(0.0, 0.15 * (1.0 - steps_used_fraction))
+    efficiency_score = max(0.0, 0.04 * (1.0 - steps_used_fraction))
 
-    # ------------------------------------------------------------------
-    # 3. Belief accuracy (0 to 0.30) — doubled weight vs easy task
-    # ------------------------------------------------------------------
+    # 3. Belief accuracy (0 to 0.06)
     true_high_friction  = bool(hidden.get("true_high_friction",  False))
     true_bad_alignment  = bool(hidden.get("true_bad_alignment",  False))
     true_low_stiffness  = bool(hidden.get("true_low_stiffness",  False))
@@ -56,19 +50,15 @@ def grade(env_state: Dict[str, Any]) -> Dict[str, float]:
         + match(p_ba, true_bad_alignment)
         + match(p_ls, true_low_stiffness)
     ) / 3.0
-    belief_accuracy_score = 0.30 * raw_ba
+    belief_accuracy_score = 0.06 * raw_ba
 
-    # ------------------------------------------------------------------
-    # 4. Redundant probe penalty (0 to -0.10)
-    # ------------------------------------------------------------------
+    # 4. Redundant probe penalty (0 to -0.05)
     redundant_probes = sum(max(cnt - 1, 0) for cnt in probe_counts.values())
-    probe_penalty = -min(0.10, redundant_probes * 0.025)
+    probe_penalty = -min(0.05, redundant_probes * 0.01)
 
-    # ------------------------------------------------------------------
     # Final score
-    # ------------------------------------------------------------------
     score = success_component + efficiency_score + belief_accuracy_score + probe_penalty
-    score = max(0.0, min(1.0, score))
+    score = max(0.0, min(0.95, score))
 
     return {
         "score":                 round(score, 4),

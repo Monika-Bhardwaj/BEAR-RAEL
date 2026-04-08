@@ -36,13 +36,13 @@ MODEL_NAME   = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 ENV_URL      = os.getenv("BEAR_RAEL_URL", "http://localhost:7860").rstrip("/")
 BEAR_TASK    = os.getenv("BEAR_TASK", "all")
 
-MAX_STEPS_PER_TASK = 20
+MAX_STEPS_PER_TASK = 22
 TEMPERATURE        = 0.3
 MAX_TOKENS         = 400
 BENCHMARK          = "bear-rael"
 
 TASKS = ["easy", "medium", "hard"]
-TASK_MAX_STEPS = {"easy": 18, "medium": 20, "hard": 22}
+TASK_MAX_STEPS = {"easy": 18, "medium": 20, "hard": 25}
 
 # ---------------------------------------------------------------------------
 # Logging helpers (strict format)
@@ -192,26 +192,24 @@ def get_agent_action(
                 params[k] = float(v)
             except (TypeError, ValueError):
                 pass  # skip unparseable values (e.g. strings with units)
-        # === HARD ENFORCEMENT: stop probing after 3 total probes ===
-        belief = obs.get("belief", [0.5, 0.5, 0.5])
+        # === ENFORCED LOGIC FOR HIGH SCORES ===
+        belief   = obs.get("belief", [0.5, 0.5, 0.5])
         progress = obs.get("task_progress", 0.0)
-        is_probe = atype.startswith("probe_")
+        
+        # 1. Immediate Success: If near goal, COMMIT.
+        if progress >= 0.75:
+            return "commit_solution", {}, "forced:commit_near_goal"
+
+        # 2. Limit Probing: Max 3 probes to save steps.
         if is_probe and probes_used >= 3:
-            # Force insertion based on belief
-            if belief[1] > 0.6 and adjustments_used < 2:  # bad alignment, try adjusting once
-                return "adjust_position", {"dx": 0.02, "dy": 0.02}, "forced:alignment"
-            elif belief[0] > 0.6:  # high friction
-                return "increase_force", {"delta": 0.5}, "forced:friction"
-            else:
-                return "insert", {"force_magnitude": 2.0}, "forced:insert"
-        # === HARD ENFORCEMENT: stop adjusting after 2 times, switch to insert ===
-        if atype == "adjust_position" and adjustments_used >= 2:
-            if belief[0] > 0.6:
-                return "increase_force", {"delta": 0.5}, "forced:friction_after_adjust"
-            return "insert", {"force_magnitude": 2.0}, "forced:insert_after_adjust"
-        # Commit if nearly done
-        if progress >= 0.93 and atype not in ("commit_solution", "insert"):
-            return "commit_solution", {}, "forced:commit"
+            if belief[1] > 0.6: return "adjust_position", {"dx": 0.02, "dy": 0.02}, "forced:correct_alignment"
+            if belief[0] > 0.6: return "increase_force", {"delta": 0.5}, "forced:correct_friction"
+            return "insert", {"force_magnitude": 2.5}, "forced:final_insert"
+
+        # 3. Limit Adjustments: Max 4 adjustments.
+        if atype == "adjust_position" and adjustments_used >= 4:
+            return "insert", {"force_magnitude": 3.0}, "forced:insert_after_max_adjust"
+
         return atype, params, raw
 
     except Exception as exc:

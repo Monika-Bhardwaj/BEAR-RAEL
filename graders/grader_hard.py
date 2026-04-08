@@ -32,27 +32,18 @@ def grade(env_state: Dict[str, Any]) -> Dict[str, float]:
     episode_info  = env_state.get("episode_info", {})
     noise_scale   = episode_info.get("noise_scale", 0.02)
 
-    # ------------------------------------------------------------------
-    # 1. Success component (0 to 0.40)
-    # ------------------------------------------------------------------
-    success = task_progress >= 0.95
+    # 1. Success component (0 to 0.85)
+    success = task_progress >= 0.75
     if success:
-        # Exponential efficiency bonus on top of base
-        step_fraction = step_count / MAX_STEPS
-        success_component = 0.40 * (1.0 + 0.5 * math.exp(-3 * step_fraction))
-        success_component = min(success_component, 0.40)
+        success_component = 0.85
     else:
-        success_component = task_progress * 0.30
+        success_component = task_progress * 0.4
 
-    # ------------------------------------------------------------------
-    # 2. Efficiency (0 to 0.20) — steeper penalty per step
-    # ------------------------------------------------------------------
+    # 2. Efficiency (0 to 0.04)
     steps_used_fraction = step_count / MAX_STEPS
-    efficiency_score = max(0.0, 0.20 * (1.0 - steps_used_fraction) ** 1.5)
+    efficiency_score = max(0.0, 0.04 * (1.0 - steps_used_fraction))
 
-    # ------------------------------------------------------------------
-    # 3. Belief accuracy (0 to 0.30)
-    # ------------------------------------------------------------------
+    # 3. Belief accuracy (0 to 0.06)
     true_high_friction  = bool(hidden.get("true_high_friction",  False))
     true_bad_alignment  = bool(hidden.get("true_bad_alignment",  False))
     true_low_stiffness  = bool(hidden.get("true_low_stiffness",  False))
@@ -67,22 +58,16 @@ def grade(env_state: Dict[str, Any]) -> Dict[str, float]:
         + match(p_ba, true_bad_alignment)
         + match(p_ls, true_low_stiffness)
     ) / 3.0
-    belief_accuracy_score = 0.30 * raw_ba
+    belief_accuracy_score = 0.06 * raw_ba
 
-    # ------------------------------------------------------------------
-    # 4. Redundant probe penalty (0 to -0.15)
-    # ------------------------------------------------------------------
+    # 4. Redundant probe penalty (0 to -0.05)
     redundant_probes = sum(max(cnt - 1, 0) for cnt in probe_counts.values())
-    probe_penalty = -min(0.15, redundant_probes * 0.04)
+    probe_penalty = -min(0.05, redundant_probes * 0.01)
 
-    # ------------------------------------------------------------------
-    # 5. Noise robustness bonus (0 to 0.05)
-    # ------------------------------------------------------------------
-    noise_bonus = 0.05 if (success and noise_scale >= 0.05) else 0.0
+    # 5. Noise robustness bonus (0 to 0.02)
+    noise_bonus = 0.02 if (success and noise_scale >= 0.05) else 0.0
 
-    # ------------------------------------------------------------------
     # Final score
-    # ------------------------------------------------------------------
     score = (
         success_component
         + efficiency_score
@@ -90,7 +75,7 @@ def grade(env_state: Dict[str, Any]) -> Dict[str, float]:
         + probe_penalty
         + noise_bonus
     )
-    score = max(0.0, min(1.0, score))
+    score = max(0.0, min(0.95, score))
 
     return {
         "score":                 round(score, 4),

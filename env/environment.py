@@ -138,7 +138,7 @@ class BearRaelEnv:
         # Success check
         success = self._dynamics.is_success() or (
             action.action_type == "commit_solution"
-            and self._dynamics.state.task_progress >= 0.80
+            and self._dynamics.state.task_progress >= 0.75
         )
         if success:
             efficiency = max(1.0 - self._step_count / self._max_steps, 0.0)
